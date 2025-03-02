@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restaurant Roster Generator (Test Version - 4 Weeks)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+        }
+        .highlight {
+            background-color: #f0f0f0;
+        }
+        .disabled {
+            display: none;
+        }
+        .error {
+            color: red;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Restaurant Roster Generator (Test Version - 4 Weeks)</h1>
+    <p>Current Date: <span id="currentDate"></span></p>
+
+    <div class="section" id="loginSection">
+        <h2>Employee Login</h2>
+        <input type="text" id="employeeName" placeholder="Enter your name">
+        <input type="text" id="employeeID" placeholder="Enter your Employee ID">
+        <button onclick="login()">Submit</button>
+        <p id="loginError" class="error"></p>
+    </div>
+
+    <div class="section disabled" id="availabilitySection">
+        <h2>My Availability</h2>
+        <p>Welcome, <span id="waitressInfo"></span>! Select a week and enter your availability.</p>
+        <select id="weekSelect">
+            <option value="1">Week 1 (March 2 - March 8, 2025)</option>
+            <option value="2">Week 2 (March 9 - March 15, 2025)</option>
+            <option value="3">Week 3 (March 16 - March 22, 2025)</option>
+            <option value="4">Week 4 (March 23 - March 29, 2025)</option>
+        </select>
+        <table id="availabilityTable">
+            <tr>
+                <th>Day</th>
+                <th>Lunch (10 AM - 5 PM)</th>
+                <th>Extra Lunch (12 PM - 5 PM)</th>
+                <th>Lunch STANBY</th>
+                <th>Dinner (5 PM - 10 PM)</th>
+                <th>Dinner (5 PM - 11 PM)</th>
+                <th>Dinner (5 PM - CLS)</th>
+            </tr>
+            <!-- Rows will be added dynamically -->
+        </table>
+        <button onclick="saveAvailability()">Save My Availability</button>
+        <button onclick="emailAvailability()">Email My Availability to Manager</button>
+    </div>
+
+    <div class="section disabled" id="managerSection">
+        <h2>Manager Dashboard</h2>
+        <button onclick="generateRoster()">Generate Roster for All Employees</button>
+        <div id="rosterOutput"></div>
+    </div>
+
+    <script>
+        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        const shifts = {
+            lunch: 'Lunch (10 AM - 5 PM)',
+            extraLunch: 'Extra Lunch (12 PM - 5 PM)',
+            lunchStandby: 'Lunch STANBY',
+            dinner1: 'Dinner (5 PM - 10 PM)',
+            dinner2: 'Dinner (5 PM - 11 PM)',
+            dinner3: 'Dinner (5 PM - CLS)'
+        };
+        let employees = []; // Store all employees' data
+        let currentEmployee = null;
+
+        // Set current date
+        document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-US', {
+            month: 'long', day: 'numeric', year: 'numeric'
+        });
+
+        // Login function to authenticate employee
+        function login() {
+            const name = document.getElementById('employeeName').value.trim();
+            const employeeID = document.getElementById('employeeID').value.trim();
+            if (!name || !employeeID) {
+                document.getElementById('loginError').textContent = 'Please enter both name and Employee ID.';
+                return;
+            }
+
+            // Simulate employee validation (in real use, check against a database or list)
+            const employeeKey = `${name}-${employeeID}`; // Unique identifier
+            currentEmployee = { name: name, employeeID: employeeID, availability: {} };
+            
+            // Check if employee exists, or add them
+            let existingEmployee = employees.find(e => e.name === name && e.employeeID === employeeID);
+            if (!existingEmployee) {
+                employees.push(currentEmployee);
+            } else {
+                currentEmployee = existingEmployee;
+            }
+
+            document.getElementById('waitressInfo').textContent = `${name} (ID: ${employeeID})`;
+            document.getElementById('loginSection').classList.add('disabled');
+            document.getElementById('availabilitySection').classList.remove('disabled');
+            initAvailabilityTable();
+            loadAvailability();
+        }
+
+        // Initialize availability table
+        function initAvailabilityTable() {
+            const table = document.getElementById('availabilityTable');
+            const selectedWeek = document.getElementById('weekSelect').value;
+            table.innerHTML = `
+                <tr>
+                    <th>Day</th>
+                    <th>Lunch (10 AM - 5 PM)</th>
+                    <th>Extra Lunch (12 PM - 5 PM)</th>
+                    <th>Lunch STANBY</th>
+                    <th>Dinner (5 PM - 10 PM)</th>
+                    <th>Dinner (5 PM - 11 PM)</th>
+                    <th>Dinner (5 PM - CLS)</th>
+                </tr>
+            `;
+            days.forEach(day => {
+                const row = table.insertRow();
+                row.innerHTML = `
+                    <td>${day}</td>
+                    <td><input type="checkbox" data-day="${day}" data-shift="${shifts.lunch}" data-week="${selectedWeek}"></td>
+                    <td><input type="checkbox" data-day="${day}" data-shift="${shifts.extraLunch}" data-week="${selectedWeek}"></td>
+                    <td><input type="checkbox" data-day="${day}" data-shift="${shifts.lunchStandby}" data-week="${selectedWeek}"></td>
+                    <td><input type="checkbox" data-day="${day}" data-shift="${shifts.dinner1}" data-week="${selectedWeek}"></td>
+                    <td><input type="checkbox" data-day="${day}" data-shift="${shifts.dinner2}" data-week="${selectedWeek}"></td>
+                    <td><input type="checkbox" data-day="${day}" data-shift="${shifts.dinner3}" data-week="${selectedWeek}"></td>
+                `;
+            });
+        }
+
+        // Load saved availability for the current employee and selected week
+        function loadAvailability() {
+            if (!currentEmployee) return;
+            const selectedWeek = document.getElementById('weekSelect').value;
+            const employeeData = currentEmployee.availability[selectedWeek] || {};
+            Object.entries(employeeData).forEach(([day, shifts]) => {
+                shifts.forEach(shift => {
+                    const checkbox = document.querySelector(`input[data-day="${day}"][data-shift="${shift}"][data-week="${selectedWeek}"]`);
+                    if (checkbox) checkbox.checked = true;
+                });
+            });
+        }
+
+        // Save availability for the current employee and selected week
+        function saveAvailability() {
+            if (!currentEmployee) return;
+
+            const selectedWeek = document.getElementById('weekSelect').value;
+            if (!currentEmployee.availability[selectedWeek]) {
+                currentEmployee.availability[selectedWeek] = {};
+            }
+
+            const checkboxes = document.querySelectorAll(`#availabilityTable input[type="checkbox"][data-week="${selectedWeek}"]`);
+            currentEmployee.availability[selectedWeek] = {};
+            checkboxes.forEach(checkbox => {
+                const day = checkbox.dataset.day;
+                const shift = checkbox.dataset.shift;
+                if (!currentEmployee.availability[selectedWeek][day]) {
+                    currentEmployee.availability[selectedWeek][day] = [];
+                }
+                if (checkbox.checked) {
+                    currentEmployee.availability[selectedWeek][day].push(shift);
+                }
+            });
+            
+            // Save to localStorage
+            localStorage.setItem('employees', JSON.stringify(employees));
+            
+            // Clear checkboxes (optional)
+            checkboxes.forEach(checkbox => checkbox.checked = false);
+            alert(`${currentEmployee.name}'s availability for Week ${selectedWeek} saved!`);
+        }
+
+        // Email availability to manager (simulated)
+        function emailAvailability() {
+            if (!currentEmployee) return;
+
+            const selectedWeek = document.getElementById('weekSelect').value;
+            const employee = currentEmployee;
+            let emailBody = `Waitress Availability Report for ${employee.name} (ID: ${employee.employeeID}) - Week ${selectedWeek}\n\n`;
+            days.forEach(day => {
+                emailBody += `${day}: `;
+                if (employee.availability[selectedWeek]?.[day]) {
+                    emailBody += employee.availability[selectedWeek][day].join(', ');
+                }
+                emailBody += '\n';
+            });
+
+            const subject = `Waitress Availability for ${employee.name} - Week ${selectedWeek}`;
+            window.location.href = `mailto:manager@example.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
+        }
+
+        // Generate roster for manager
+        function generateRoster() {
+            if (!employees.length) {
+                alert('No employee data available. Please ensure all waitresses have submitted their availability.');
+                return;
+            }
+
+            let rosterOutput = '<h3>Weekly Roster for 4 Weeks</h3>';
+            for (let week = 1; week <= 4; week++) {
+                rosterOutput += `<h4>Week ${week} (March ${2 + (week - 1) * 7} - March ${8 + (week - 1) * 7}, 2025)</h4>`;
+                rosterOutput += '<table><tr><th>Day</th><th>Lunch (10 AM - 5 PM)</th><th>Extra Lunch (12 PM - 5 PM)</th><th>Lunch STANBY</th><th>Dinner (5 PM - 10 PM)</th><th>Dinner (5 PM - 11 PM)</th><th>Dinner (5 PM - CLS)</th></tr>';
+
+                days.forEach(day => {
+                    const row = `<tr><td>${day}</td>`;
+                    const shiftRequirements = {
+                        [shifts.lunch]: 1,
+                        [shifts.extraLunch]: 1,
+                        [shifts.lunchStandby]: 1,
+                        [shifts.dinner1]: 1,
+                        [shifts.dinner2]: 1,
+                        [shifts.dinner3]: 1
+                    };
+
+                    let cells = '';
+                    Object.values(shifts).forEach(shift => {
+                        const available = employees.filter(e => 
+                            e.availability[week]?.[day] && e.availability[week][day].includes(shift)
+                        );
+                        let staff = 'NO STAFF AVAILABLE';
+                        if (available.length > 0) {
+                            const maxStaff = Math.min(shiftRequirements[shift] || 2, available.length);
+                            const shuffled = available.sort(() => 0.5 - Math.random());
+                            const selected = shuffled.slice(0, maxStaff);
+                            staff = selected.map(e => `${e.name} (ID: ${e.employeeID})`).join(', ');
+                        }
+                        cells += `<td>${staff}</td>`;
+                    });
+                    rosterOutput += row + cells + '</tr>';
+                });
+                rosterOutput += '</table>';
+            }
+
+            document.getElementById('rosterOutput').innerHTML = rosterOutput;
+            document.getElementById('managerSection').classList.remove('disabled');
+        }
+
+        // Handle week selection change
+        document.getElementById('weekSelect').addEventListener('change', () => {
+            initAvailabilityTable();
+            loadAvailability();
+        });
+
+        // Load saved data on page load (for manager or testing)
+        window.onload = function() {
+            const savedEmployees = localStorage.getItem('employees');
+            if (savedEmployees) {
+                employees = JSON.parse(savedEmployees);
+            }
+            // No auto-login; users must enter name and ID or use query parameters
+        };
+    </script>
+</body>
+</html>
